@@ -8,7 +8,7 @@ import EnvironmentPanel from './components/EnvironmentPanel'
 import AlertBanner from './components/AlertBanner'
 import './index.css'
 
-const API = 'http://localhost:5000/api'
+const API = `http://${window.location.hostname}:5000/api`
 
 export default function App() {
   const [data, setData] = useState(null)
