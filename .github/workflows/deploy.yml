@@ -22,7 +22,7 @@ jobs:
           script: |
             # Navigate to the project directory
             # Make sure you clone the repository on the EC2 instance first!
-            cd ~/Smart-Parking-System || exit 1
+            cd ~/smart-parking-ev || exit 1
             
             # Pull latest changes from git
             git pull origin main
