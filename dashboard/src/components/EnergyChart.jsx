@@ -1,0 +1,93 @@
+import React from 'react'
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, Cell
+} from 'recharts'
+
+const COLORS = ['#3b82f6', '#06b6d4', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#ef4444', '#6366f1']
+
+const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null
+    return (
+        <div style={{
+            background: '#1e2235', border: '1px solid #2a2f4a',
+            borderRadius: 8, padding: '10px 14px', fontSize: 12
+        }}>
+            <div style={{ color: '#9ca3b8', marginBottom: 4 }}>{label}</div>
+            <div style={{ color: '#e8eaf0', fontWeight: 600 }}>
+                {payload[0].value.toFixed(3)} kWh
+            </div>
+        </div>
+    )
+}
+
+export default function EnergyChart({ history }) {
+    // Get latest per_charger data from most recent record
+    const latest = history && history.length > 0 ? history[history.length - 1] : null
+    const perCharger = latest?.per_charger || {}
+
+    const chartData = Object.entries(perCharger).map(([id, kwh]) => ({
+        name: id,
+        kwh: kwh
+    }))
+
+    if (chartData.length === 0) {
+        // Fallback: show energy trend over time
+        const trendData = (history || []).map((item, i) => ({
+            name: `T${i + 1}`,
+            kwh: item.total_kwh || 0
+        }))
+
+        return (
+            <div className="panel">
+                <div className="panel-title">
+                    <span className="icon">📊</span>
+                    Energy Consumption Trend
+                </div>
+                {trendData.length > 0 ? (
+                    <div className="chart-container">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={trendData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#2a2f4a" />
+                                <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} />
+                                <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Bar dataKey="kwh" radius={[4, 4, 0, 0]}>
+                                    {trendData.map((_, i) => (
+                                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                ) : (
+                    <div className="empty-state">Waiting for energy data…</div>
+                )}
+            </div>
+        )
+    }
+
+    return (
+        <div className="panel">
+            <div className="panel-title">
+                <span className="icon">📊</span>
+                Energy per Charger (kWh)
+            </div>
+            <div className="chart-container">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#2a2f4a" />
+                        <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} />
+                        <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Bar dataKey="kwh" radius={[4, 4, 0, 0]}>
+                            {chartData.map((_, i) => (
+                                <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+    )
+}

@@ -1,0 +1,46 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main # Or your default branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }} # Usually ubuntu or ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Navigate to the project directory
+            # Make sure you clone the repository on the EC2 instance first!
+            cd ~/Smart-Parking-System || exit 1
+            
+            # Pull latest changes from git
+            git pull origin main
+
+            # Setup Python Virtual Environment and Install Dependencies
+            python3 -m venv .venv
+            source .venv/bin/activate
+            # Upgrade pip and install standard packages (if needed)
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            
+            # Setup Frontend Dashboard (Install deps)
+            cd dashboard
+            npm install
+            cd ..
+
+            # Restart the PM2 processes with the latest code
+            pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js
+            
+            # Save the PM2 list so it restarts on system reboot
+            pm2 save
