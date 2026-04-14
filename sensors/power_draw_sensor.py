@@ -11,9 +11,9 @@ import random
 import math
 from datetime import datetime, timezone
 
-import paho.mqtt.client as mqtt
+import boto3
 from config import (
-    MQTT_BROKER, MQTT_PORT, LOT_ID,
+    AWS_REGION, SQS_QUEUE_URL, LOT_ID,
     TOTAL_CHARGERS, POWER_DRAW_INTERVAL, MAX_POWER_KW
 )
 
@@ -77,9 +77,8 @@ class PowerDrawSensor:
 
 
 def run():
-    client = mqtt.Client(client_id="power-draw-sim", protocol=mqtt.MQTTv311)
-    client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
-    client.loop_start()
+    sqs = boto3.client('sqs', region_name=AWS_REGION)
+
 
     sensors = [PowerDrawSensor(f"CHG-{i:02d}") for i in range(1, TOTAL_CHARGERS + 1)]
     print(f"[PowerDraw] Simulating {len(sensors)} chargers  →  "
@@ -90,13 +89,15 @@ def run():
             for s in sensors:
                 reading = s.tick()
                 topic = f"parking/{LOT_ID}/charger/{s.charger_id}/power"
-                client.publish(topic, json.dumps(reading), qos=0)
+                
+                sqs_payload = {"topic": topic, "payload": reading}
+                sqs.send_message(QueueUrl=SQS_QUEUE_URL, MessageBody=json.dumps(sqs_payload))
+                
             time.sleep(POWER_DRAW_INTERVAL)
     except KeyboardInterrupt:
         print("[PowerDraw] Shutting down …")
-    finally:
-        client.loop_stop()
-        client.disconnect()
+    except Exception as e:
+        print(f"[PowerDraw] SQS Error: {e}")
 
 
 if __name__ == "__main__":

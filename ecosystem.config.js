@@ -1,27 +1,6 @@
 module.exports = {
   apps: [
     {
-      name: "mqtt-broker",
-      script: ".venv/bin/python",
-      args: "mqtt_broker.py",
-      interpreter: "none",
-      watch: false
-    },
-    {
-      name: "cloud-api",
-      script: ".venv/bin/python",
-      args: "cloud/server.py",
-      interpreter: "none",
-      watch: false
-    },
-    {
-      name: "fog-node",
-      script: ".venv/bin/python",
-      args: "fog/fog_node.py",
-      interpreter: "none",
-      watch: false
-    },
-    {
       name: "sensor-occupancy",
       script: ".venv/bin/python",
       args: "sensors/occupancy_sensor.py",
@@ -58,11 +37,13 @@ module.exports = {
     },
     {
       name: "dashboard",
-      script: "npm",
-      args: "run dev -- --host 0.0.0.0",
-      cwd: "./dashboard",
-      interpreter: "none",
-      watch: false
+      script: "serve",
+      env: {
+        PM2_SERVE_PATH: 'dashboard/dist',
+        PM2_SERVE_PORT: 8080,
+        PM2_SERVE_SPA: 'true',
+        PM2_SERVE_HOMEPAGE: '/index.html'
+      }
     }
   ]
 };

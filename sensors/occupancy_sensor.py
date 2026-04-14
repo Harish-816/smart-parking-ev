@@ -11,9 +11,9 @@ import random
 import threading
 from datetime import datetime, timezone
 
-import paho.mqtt.client as mqtt
+import boto3
 from config import (
-    MQTT_BROKER, MQTT_PORT, LOT_ID,
+    AWS_REGION, SQS_QUEUE_URL, LOT_ID,
     TOTAL_SPOTS, OCCUPANCY_INTERVAL,
     OCCUPANCY_THRESHOLD_CM, OCCUPANCY_NOISE_PROB
 )
@@ -50,9 +50,8 @@ class OccupancySensor:
 
 
 def run():
-    client = mqtt.Client(client_id="occupancy-sensor-sim", protocol=mqtt.MQTTv311)
-    client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
-    client.loop_start()
+    sqs = boto3.client('sqs', region_name=AWS_REGION)
+
 
     # Create sensors — ~60 % initially occupied
     sensors = []
@@ -68,13 +67,16 @@ def run():
             for sensor in sensors:
                 reading = sensor.read()
                 topic = f"parking/{LOT_ID}/spot/{sensor.spot_id}/occupancy"
-                client.publish(topic, json.dumps(reading), qos=0)
+                
+                # Wrap the topic and reading into a single SQS payload
+                sqs_payload = {"topic": topic, "payload": reading}
+                sqs.send_message(QueueUrl=SQS_QUEUE_URL, MessageBody=json.dumps(sqs_payload))
+                
             time.sleep(OCCUPANCY_INTERVAL)
     except KeyboardInterrupt:
         print("[Occupancy] Shutting down …")
-    finally:
-        client.loop_stop()
-        client.disconnect()
+    except Exception as e:
+        print(f"[Occupancy] SQS Error: {e}")
 
 
 if __name__ == "__main__":

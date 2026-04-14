@@ -11,8 +11,8 @@ import math
 import random
 from datetime import datetime, timezone
 
-import paho.mqtt.client as mqtt
-from config import MQTT_BROKER, MQTT_PORT, LOT_ID, LIGHT_INTERVAL
+import boto3
+from config import AWS_REGION, SQS_QUEUE_URL, LOT_ID, LIGHT_INTERVAL
 
 
 def get_simulated_light() -> tuple:
@@ -36,9 +36,8 @@ def get_simulated_light() -> tuple:
 
 
 def run():
-    client = mqtt.Client(client_id="light-sim", protocol=mqtt.MQTTv311)
-    client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
-    client.loop_start()
+    sqs = boto3.client('sqs', region_name=AWS_REGION)
+
 
     print(f"[Light] Publishing every {LIGHT_INTERVAL}s")
 
@@ -52,15 +51,17 @@ def run():
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             topic = f"parking/{LOT_ID}/environment/light"
-            client.publish(topic, json.dumps(payload), qos=0)
+            
+            sqs_payload = {"topic": topic, "payload": payload}
+            sqs.send_message(QueueUrl=SQS_QUEUE_URL, MessageBody=json.dumps(sqs_payload))
+            
             icon = "☀️" if daylight else "🌙"
             print(f"  {icon}  {lux} lux")
             time.sleep(LIGHT_INTERVAL)
     except KeyboardInterrupt:
         print("[Light] Shutting down …")
-    finally:
-        client.loop_stop()
-        client.disconnect()
+    except Exception as e:
+        print(f"[Light] SQS Error: {e}")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ import EnvironmentPanel from './components/EnvironmentPanel'
 import AlertBanner from './components/AlertBanner'
 import './index.css'
 
-const API = `http://${window.location.hostname}:5000/api`
+const API = `https://l9hs049p42.execute-api.us-east-1.amazonaws.com/api`
 
 export default function App() {
   const [data, setData] = useState(null)
@@ -20,20 +20,39 @@ export default function App() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [summary, occ, energy, env] = await Promise.all([
-        axios.get(`${API}/dashboard/summary`),
-        axios.get(`${API}/parking/occupancy-history`),
-        axios.get(`${API}/chargers/energy`),
-        axios.get(`${API}/environment/history`),
-      ])
+      const summary = await axios.get(`${API}/dashboard/summary`)
       setData(summary.data)
-      setOccHistory(occ.data.reverse().slice(-30))
-      setEnergyHistory(energy.data.reverse().slice(-30))
-      setEnvHistory(env.data.reverse().slice(-30))
+
+      // Build history snapshots from the summary data itself
+      const now = new Date().toISOString()
+      const p = summary.data?.parking || {}
+      const env = summary.data?.environment || {}
+
+      setOccHistory(prev => [...prev.slice(-29), {
+        recorded_at: now,
+        occupied: p.occupied || 0,
+        available: p.available || 0,
+        occ_pct: p.occupancy_pct || 0
+      }])
+
+      setEnergyHistory(prev => [...prev.slice(-29), {
+        recorded_at: now,
+        total_kwh: (summary.data?.chargers || [])
+          .reduce((sum, c) => sum + parseFloat(c.energy_kwh || 0), 0)
+      }])
+
+      setEnvHistory(prev => [...prev.slice(-29), {
+        recorded_at: now,
+        avg_temp_c: env.avg_temp_c || 0,
+        avg_humidity: env.avg_humidity_pct || 0,
+        avg_lux: env.avg_lux || 0
+      }])
+
       setLastUpdate(new Date())
       setLoading(false)
     } catch (err) {
       console.error('API fetch failed:', err)
+      setLoading(false)
     }
   }, [])
 
@@ -54,11 +73,11 @@ export default function App() {
 
   const p = data?.parking || {}
   const chargers = data?.chargers || []
-  const energy = data?.energy || {}
   const env = data?.environment || {}
   const alerts = data?.blocked_alerts || []
   const activeChargers = chargers.filter(c => c.status === 'in_use').length
-  const blockedChargers = chargers.filter(c => c.is_blocked).length
+  const blockedChargers = chargers.filter(c => c.status === 'blocked').length
+  const totalEnergy = chargers.reduce((sum, c) => sum + parseFloat(c.energy_kwh || 0), 0)
 
   return (
     <>
@@ -120,7 +139,7 @@ export default function App() {
             <div className="stat-icon amber">🔋</div>
             <div className="stat-info">
               <div className="stat-label">Energy Used</div>
-              <div className="stat-value">{energy.total_kwh?.toFixed(1) ?? '0'}</div>
+              <div className="stat-value">{totalEnergy.toFixed(1)}</div>
               <div className="stat-sub">kWh total</div>
             </div>
           </div>

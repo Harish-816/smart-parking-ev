@@ -37,13 +37,17 @@ jobs:
             pip install --upgrade pip
             pip install -r requirements.txt
             
-            # Setup Frontend Dashboard (Install deps)
+            # Setup Frontend Dashboard (Install deps and build)
             cd dashboard
             npm install
+            npm run build
             cd ..
 
+            # Ensure pm2 references are fresh
+            pm2 delete all || true
+
             # Restart the PM2 processes with the latest code
-            pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js
+            pm2 start ecosystem.config.js
             
             # Save the PM2 list so it restarts on system reboot
             pm2 save

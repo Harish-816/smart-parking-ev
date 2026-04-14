@@ -3,3 +3,4 @@ flask==3.0.0
 flask-cors==4.0.0
 numpy==1.26.2
 amqtt==0.11.0
+boto3==1.34.0

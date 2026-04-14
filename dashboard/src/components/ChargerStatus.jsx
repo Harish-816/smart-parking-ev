@@ -29,9 +29,9 @@ export default function ChargerStatus({ chargers }) {
                                 {displayStatus.replace('_', ' ')}
                             </span>
                             <div className="power" style={{
-                                color: ch.power_kw > 0 ? '#3b82f6' : '#6b7280'
+                                color: parseFloat(ch.power_kw) > 0 ? '#3b82f6' : '#6b7280'
                             }}>
-                                {(ch.power_kw || 0).toFixed(1)} <span style={{ fontSize: 12, fontWeight: 400 }}>kW</span>
+                                {parseFloat(ch.power_kw || 0).toFixed(1)} <span style={{ fontSize: 12, fontWeight: 400 }}>kW</span>
                             </div>
                             {ch.vehicle_id && (
                                 <div className="vehicle">🚗 {ch.vehicle_id}</div>

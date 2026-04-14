@@ -11,8 +11,8 @@ import math
 import random
 from datetime import datetime, timezone
 
-import paho.mqtt.client as mqtt
-from config import MQTT_BROKER, MQTT_PORT, LOT_ID, TEMPERATURE_INTERVAL
+import boto3
+from config import AWS_REGION, SQS_QUEUE_URL, LOT_ID, TEMPERATURE_INTERVAL
 
 
 def get_simulated_temperature() -> tuple:
@@ -30,9 +30,8 @@ def get_simulated_temperature() -> tuple:
 
 
 def run():
-    client = mqtt.Client(client_id="temperature-sim", protocol=mqtt.MQTTv311)
-    client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
-    client.loop_start()
+    sqs = boto3.client('sqs', region_name=AWS_REGION)
+
 
     print(f"[Temperature] Publishing every {TEMPERATURE_INTERVAL}s")
 
@@ -46,14 +45,16 @@ def run():
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             topic = f"parking/{LOT_ID}/environment/temperature"
-            client.publish(topic, json.dumps(payload), qos=0)
+            
+            sqs_payload = {"topic": topic, "payload": payload}
+            sqs.send_message(QueueUrl=SQS_QUEUE_URL, MessageBody=json.dumps(sqs_payload))
+            
             print(f"  🌡️  {temp_c}°C  |  💧 {humidity_pct}%")
             time.sleep(TEMPERATURE_INTERVAL)
     except KeyboardInterrupt:
         print("[Temperature] Shutting down …")
-    finally:
-        client.loop_stop()
-        client.disconnect()
+    except Exception as e:
+        print(f"[Temperature] SQS Error: {e}")
 
 
 if __name__ == "__main__":

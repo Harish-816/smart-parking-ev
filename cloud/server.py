@@ -235,8 +235,17 @@ def start_mqtt():
 # ═══════════════════════════════════════════════════════════════
 # FLASK APP
 # ═══════════════════════════════════════════════════════════════
-app = Flask(__name__)
+app = Flask(__name__, static_folder="../dashboard/dist", static_url_path="/")
 CORS(app)
+
+@app.route("/")
+def serve_react():
+    return app.send_static_file("index.html")
+
+@app.errorhandler(404)
+def not_found(e):
+    # Route all 404s back to React's index.html for client-side routing
+    return app.send_static_file("index.html")
 
 
 @app.route("/api/parking/availability")
