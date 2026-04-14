@@ -37,13 +37,10 @@ module.exports = {
     },
     {
       name: "dashboard",
-      script: "serve",
-      env: {
-        PM2_SERVE_PATH: 'dashboard/dist',
-        PM2_SERVE_PORT: 8080,
-        PM2_SERVE_SPA: 'true',
-        PM2_SERVE_HOMEPAGE: '/index.html'
-      }
+      cwd: "dashboard",
+      script: "server.js",
+      interpreter: "node",
+      watch: false
     }
   ]
 };

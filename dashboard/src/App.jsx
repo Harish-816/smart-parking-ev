@@ -8,7 +8,7 @@ import EnvironmentPanel from './components/EnvironmentPanel'
 import AlertBanner from './components/AlertBanner'
 import './index.css'
 
-const API = `https://l9hs049p42.execute-api.us-east-1.amazonaws.com/api`
+const API = `/api`
 
 export default function App() {
   const [data, setData] = useState(null)

@@ -1,0 +1,29 @@
+const express = require('express');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+const cors = require('cors');
+const path = require('path');
+
+const app = express();
+
+// Enable CORS for local development testing
+app.use(cors());
+
+// 1. Proxy all /api traffic to AWS API Gateway
+app.use('/api', createProxyMiddleware({
+    target: 'https://l9hs049p42.execute-api.us-east-1.amazonaws.com',
+    changeOrigin: true,
+    secure: false,
+}));
+
+// 2. Serve the compiled React Dashboard locally
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// 3. Match all other routes to index.html (SPA Fallback)
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+const PORT = 8080;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Smart Parking Proxy Server running on port ${PORT}`);
+});
