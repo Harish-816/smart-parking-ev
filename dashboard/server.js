@@ -17,6 +17,9 @@ app.use('/api', createProxyMiddleware({
     target: 'https://l9hs049p42.execute-api.us-east-1.amazonaws.com',
     changeOrigin: true,
     secure: false,
+    pathRewrite: {
+        '^/': '/api/'
+    }
 }));
 
 // 2. Serve the compiled React Dashboard locally
