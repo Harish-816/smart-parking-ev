@@ -6,7 +6,7 @@ import {
 
 const COLORS = ['#3b82f6', '#06b6d4', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#ef4444', '#6366f1']
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, unit = 'kWh' }) => {
     if (!active || !payload?.length) return null
     return (
         <div style={{
@@ -15,7 +15,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         }}>
             <div style={{ color: '#9ca3b8', marginBottom: 4 }}>{label}</div>
             <div style={{ color: '#e8eaf0', fontWeight: 600 }}>
-                {payload[0].value.toFixed(3)} kWh
+                {payload[0].value.toFixed(2)} {unit}
             </div>
         </div>
     )
@@ -26,10 +26,18 @@ export default function EnergyChart({ history }) {
     const latest = history && history.length > 0 ? history[history.length - 1] : null
     const perCharger = latest?.per_charger || {}
 
-    const chartData = Object.entries(perCharger).map(([id, kwh]) => ({
-        name: id,
-        kwh: kwh
-    }))
+    const chartData = Object.entries(perCharger)
+        .filter(([, v]) => v > 0)  // only show chargers with non-zero value
+        .map(([id, val]) => ({
+            name: id,
+            kwh: val
+        }))
+
+    // Detect if values look like power (kW) or energy (kWh)
+    const maxVal = Math.max(...chartData.map(d => d.kwh), 0)
+    const isPower = maxVal > 5  // energy_kwh per interval is tiny (<1); power_kw is >5
+    const unit = isPower ? 'kW' : 'kWh'
+    const title = isPower ? 'Live Power Draw (kW)' : 'Energy per Charger (kWh)'
 
     if (chartData.length === 0) {
         // Fallback: show energy trend over time
@@ -51,7 +59,7 @@ export default function EnergyChart({ history }) {
                                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2f4a" />
                                 <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} />
                                 <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} />
-                                <Tooltip content={<CustomTooltip />} />
+                                <Tooltip content={<CustomTooltip unit="kWh" />} />
                                 <Bar dataKey="kwh" radius={[4, 4, 0, 0]}>
                                     {trendData.map((_, i) => (
                                         <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -71,7 +79,7 @@ export default function EnergyChart({ history }) {
         <div className="panel">
             <div className="panel-title">
                 <span className="icon">📊</span>
-                Energy per Charger (kWh)
+                {title}
             </div>
             <div className="chart-container">
                 <ResponsiveContainer width="100%" height="100%">
@@ -79,7 +87,7 @@ export default function EnergyChart({ history }) {
                         <CartesianGrid strokeDasharray="3 3" stroke="#2a2f4a" />
                         <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 10 }} />
                         <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} />
-                        <Tooltip content={<CustomTooltip />} />
+                        <Tooltip content={<CustomTooltip unit={unit} />} />
                         <Bar dataKey="kwh" radius={[4, 4, 0, 0]}>
                             {chartData.map((_, i) => (
                                 <Cell key={i} fill={COLORS[i % COLORS.length]} />

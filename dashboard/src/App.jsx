@@ -35,16 +35,26 @@ export default function App() {
         occ_pct: p.occupancy_pct || 0
       }])
 
+      const chargerList = summary.data?.chargers || []
+      const perCharger = {}
+      chargerList.forEach(c => {
+        // Prefer energy_kwh per charger (AWS), fallback to power_kw as proxy (local)
+        perCharger[c.charger_id] = parseFloat(c.energy_kwh || c.power_kw || 0)
+      })
+      const totalKwh = chargerList.some(c => c.energy_kwh)
+        ? chargerList.reduce((s, c) => s + parseFloat(c.energy_kwh || 0), 0)
+        : parseFloat(summary.data?.energy?.total_kwh || 0)
+
       setEnergyHistory(prev => [...prev.slice(-29), {
         recorded_at: now,
-        total_kwh: (summary.data?.chargers || [])
-          .reduce((sum, c) => sum + parseFloat(c.energy_kwh || 0), 0)
+        total_kwh: totalKwh,
+        per_charger: perCharger
       }])
 
       setEnvHistory(prev => [...prev.slice(-29), {
         recorded_at: now,
         avg_temp_c: env.avg_temp_c || 0,
-        avg_humidity: env.avg_humidity_pct || 0,
+        avg_humidity: env.avg_humidity || env.avg_humidity_pct || 0,
         avg_lux: env.avg_lux || 0
       }])
 
@@ -77,7 +87,10 @@ export default function App() {
   const alerts = data?.blocked_alerts || []
   const activeChargers = chargers.filter(c => c.status === 'in_use').length
   const blockedChargers = chargers.filter(c => c.status === 'blocked').length
-  const totalEnergy = chargers.reduce((sum, c) => sum + parseFloat(c.energy_kwh || 0), 0)
+  // Support both AWS (energy_kwh per charger) and local Flask (energy object)
+  const totalEnergy = chargers.some(c => c.energy_kwh)
+    ? chargers.reduce((sum, c) => sum + parseFloat(c.energy_kwh || 0), 0)
+    : parseFloat(data?.energy?.total_kwh || 0)
 
   return (
     <>

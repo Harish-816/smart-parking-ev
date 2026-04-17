@@ -1,0 +1,200 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Smart Parking + EV Charger Status - Full AWS Infrastructure"
+
+Parameters:
+  LabRoleArn:
+    Type: String
+    Description: "ARN of the LabRole IAM role (e.g. arn:aws:iam::ACCOUNT_ID:role/LabRole)"
+
+Resources:
+
+  # ─── SQS Queue ────────────────────────────────────────────────────────────────
+  SmartParkingDataQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: SmartParkingDataQueue
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 3600
+
+  # ─── DynamoDB Tables ──────────────────────────────────────────────────────────
+  ParkingSpots:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ParkingSpots
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: spot_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: spot_id
+          KeyType: HASH
+
+  ChargerStatus:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ChargerStatus
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: charger_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: charger_id
+          KeyType: HASH
+
+  Environment:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Environment
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: lot_id
+          AttributeType: S
+        - AttributeName: type
+          AttributeType: S
+      KeySchema:
+        - AttributeName: lot_id
+          KeyType: HASH
+        - AttributeName: type
+          KeyType: RANGE
+
+  # ─── Lambda: Fog Processor (SQS-triggered) ───────────────────────────────────
+  FogProcessorLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - ParkingSpots
+      - ChargerStatus
+      - Environment
+    Properties:
+      FunctionName: SmartParkingFogProcessor
+      Runtime: python3.12
+      Handler: fog_processor_lambda.lambda_handler
+      Role: !Ref LabRoleArn
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          PARKING_TABLE: ParkingSpots
+          CHARGER_TABLE: ChargerStatus
+          ENV_TABLE: Environment
+      Code:
+        ZipFile: |
+          # Placeholder - replaced by CI/CD deploy
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "placeholder"}
+
+  # SQS Event Source Mapping
+  FogProcessorEventSource:
+    Type: AWS::Lambda::EventSourceMapping
+    DependsOn: FogProcessorLambda
+    Properties:
+      EventSourceArn: !GetAtt SmartParkingDataQueue.Arn
+      FunctionName: !GetAtt FogProcessorLambda.Arn
+      BatchSize: 10
+      Enabled: true
+
+  # ─── Lambda: API Handler (invoked by API Gateway) ────────────────────────────
+  APIHandlerLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - ParkingSpots
+      - ChargerStatus
+      - Environment
+    Properties:
+      FunctionName: SmartParkingAPIHandler
+      Runtime: python3.12
+      Handler: api_gateway_lambda.lambda_handler
+      Role: !Ref LabRoleArn
+      Timeout: 30
+      MemorySize: 128
+      Code:
+        ZipFile: |
+          # Placeholder - replaced by CI/CD deploy
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "placeholder"}
+
+  # ─── API Gateway (HTTP API) ───────────────────────────────────────────────────
+  SmartParkingHttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: SmartParkingAPI
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - OPTIONS
+        AllowHeaders:
+          - "*"
+
+  APIHandlerIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref SmartParkingHttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub
+        - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations"
+        - LambdaArn: !GetAtt APIHandlerLambda.Arn
+      PayloadFormatVersion: "2.0"
+
+  DashboardRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref SmartParkingHttpApi
+      RouteKey: "GET /dashboard/summary"
+      Target: !Sub "integrations/${APIHandlerIntegration}"
+
+  ParkingRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref SmartParkingHttpApi
+      RouteKey: "GET /parking/availability"
+      Target: !Sub "integrations/${APIHandlerIntegration}"
+
+  ChargersRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref SmartParkingHttpApi
+      RouteKey: "GET /chargers/status"
+      Target: !Sub "integrations/${APIHandlerIntegration}"
+
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref SmartParkingHttpApi
+      StageName: "$default"
+      AutoDeploy: true
+
+  # Allow API Gateway to invoke the Lambda
+  APIHandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt APIHandlerLambda.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${SmartParkingHttpApi}/*/*"
+
+Outputs:
+  SQSQueueUrl:
+    Description: "SQS Queue URL for sensor data"
+    Value: !Ref SmartParkingDataQueue
+    Export:
+      Name: SmartParkingDataQueueUrl
+
+  SQSQueueArn:
+    Description: "SQS Queue ARN"
+    Value: !GetAtt SmartParkingDataQueue.Arn
+
+  APIGatewayUrl:
+    Description: "API Gateway base URL"
+    Value: !Sub "https://${SmartParkingHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: SmartParkingAPIUrl
+
+  FogProcessorArn:
+    Description: "Fog Processor Lambda ARN"
+    Value: !GetAtt FogProcessorLambda.Arn
+
+  APIHandlerArn:
+    Description: "API Handler Lambda ARN"
+    Value: !GetAtt APIHandlerLambda.Arn

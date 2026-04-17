@@ -11,8 +11,9 @@ import math
 import random
 from datetime import datetime, timezone
 
-import boto3
-from config import AWS_REGION, SQS_QUEUE_URL, LOT_ID, LIGHT_INTERVAL
+import paho.mqtt.client as mqtt
+from config import MQTT_BROKER, MQTT_PORT, LOT_ID, LIGHT_INTERVAL
+from sqs_publisher import send_to_sqs, is_sqs_enabled
 
 
 def get_simulated_light() -> tuple:
@@ -20,13 +21,10 @@ def get_simulated_light() -> tuple:
     hour = datetime.now().hour + datetime.now().minute / 60.0
 
     if 6 <= hour <= 18:
-        # Daytime: sinusoidal curve peaking at noon
         base_lux = 800 * math.sin(math.pi * (hour - 6) / 12)
-        # Simulate cloud cover
         cloud_factor = random.choice([1.0, 1.0, 1.0, 0.6, 0.4])
         lux = base_lux * cloud_factor + random.uniform(-30, 30)
     else:
-        # Night time: dim artificial lighting
         lux = random.uniform(5, 50)
 
     lux = max(0, round(lux, 1))
@@ -36,10 +34,11 @@ def get_simulated_light() -> tuple:
 
 
 def run():
-    sqs = boto3.client('sqs', region_name=AWS_REGION)
+    client = mqtt.Client(client_id="light-sensor", protocol=mqtt.MQTTv311)
+    client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
+    client.loop_start()
 
-
-    print(f"[Light] Publishing every {LIGHT_INTERVAL}s")
+    print(f"[Light] Publishing every {LIGHT_INTERVAL}s to MQTT")
 
     try:
         while True:
@@ -51,17 +50,18 @@ def run():
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             topic = f"parking/{LOT_ID}/environment/light"
-            
-            sqs_payload = {"topic": topic, "payload": payload}
-            sqs.send_message(QueueUrl=SQS_QUEUE_URL, MessageBody=json.dumps(sqs_payload))
-            
+            client.publish(topic, json.dumps(payload))
+            # Dual-publish to SQS when running on AWS
+            if is_sqs_enabled():
+                send_to_sqs(topic, payload)
             icon = "☀️" if daylight else "🌙"
             print(f"  {icon}  {lux} lux")
             time.sleep(LIGHT_INTERVAL)
     except KeyboardInterrupt:
         print("[Light] Shutting down …")
-    except Exception as e:
-        print(f"[Light] SQS Error: {e}")
+    finally:
+        client.loop_stop()
+        client.disconnect()
 
 
 if __name__ == "__main__":

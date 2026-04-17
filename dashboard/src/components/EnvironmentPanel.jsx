@@ -44,7 +44,7 @@ export default function EnvironmentPanel({ current, history }) {
                 <div className="env-gauge">
                     <div className="icon">💧</div>
                     <div className="value" style={{ color: '#06b6d4' }}>
-                        {current?.avg_humidity_pct?.toFixed(0) ?? '—'}%
+                        {(current?.avg_humidity ?? current?.avg_humidity_pct)?.toFixed(0) ?? '—'}%
                     </div>
                     <div className="label">Humidity</div>
                 </div>

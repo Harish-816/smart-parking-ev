@@ -1,8 +1,14 @@
 # ─── Sensor Configuration ───────────────────────────────────────
 # Shared settings for all sensor simulators
 
+# ─── Local MQTT Broker ─────────────────────────────────────────
+MQTT_BROKER = "localhost"
+MQTT_PORT   = 1883
+
+# (AWS settings kept for reference — not used in local mode)
 AWS_REGION = "us-east-1"
-SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/614347200749/SmartParkingDataQueue"
+SQS_QUEUE_URL = os.environ.get("SQS_QUEUE_URL", "https://sqs.us-east-1.amazonaws.com/730679665100/SmartParkingDataQueue")
+USE_SQS = os.environ.get("USE_SQS", "0").strip().lower() in ("1", "true", "yes")
 LOT_ID = "LOT-1"
 
 # ─── Intervals (seconds) ───────────────────────────────────────
