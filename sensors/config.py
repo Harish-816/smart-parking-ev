@@ -1,3 +1,5 @@
+import os
+
 # ─── Sensor Configuration ───────────────────────────────────────
 # Shared settings for all sensor simulators
 
